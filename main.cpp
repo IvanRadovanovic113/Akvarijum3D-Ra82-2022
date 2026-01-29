@@ -15,6 +15,21 @@
 
 bool transparent = false;
 
+// Pozicija ribe i rotacija
+glm::vec3 fishPos(0.0f, 0.0f, 0.0f);
+float fishSpeed = 0.01f;
+float fishRotationY = 0.0f;  // rotacija oko Y ose (levo/desno okretanje)
+
+// Granice akvarijuma (sa marginom za stakla i ribu)
+const float W = 6.0f, H = 4.0f, D = 3.0f;
+const float margin = 0.3f;  // margina od zidova
+const float minX = -W / 2 + margin;
+const float maxX = W / 2 - margin;
+const float minY = -H / 2 + 0.4f;  // malo iznad peska
+const float maxY = H / 2 - margin/2;
+const float minZ = -D / 2 + margin;
+const float maxZ = D / 2 - margin;
+
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_T && action == GLFW_PRESS)
@@ -22,6 +37,41 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+}
+
+void processInput(GLFWwindow* window)
+{
+    // WASD - kretanje levo/desno/napred/nazad
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        fishPos.z -= fishSpeed;
+        fishRotationY = -90.0f;   // gleda napred (od kamere)
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        fishPos.z += fishSpeed;
+        fishRotationY = 90.0f;  // gleda nazad (ka kameri)
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        fishPos.x -= fishSpeed;
+        fishRotationY = 0.0f;    // gleda levo
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        fishPos.x += fishSpeed;
+        fishRotationY = 180.0f;  // gleda desno
+    }
+
+    // QE - kretanje gore/dole (bez promene rotacije)
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        fishPos.y += fishSpeed;
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        fishPos.y -= fishSpeed;
+
+    // Ogranici poziciju ribe unutar akvarijuma
+    if (fishPos.x < minX) fishPos.x = minX;
+    if (fishPos.x > maxX) fishPos.x = maxX;
+    if (fishPos.y < minY) fishPos.y = minY;
+    if (fishPos.y > maxY) fishPos.y = maxY;
+    if (fishPos.z < minZ) fishPos.z = minZ;
+    if (fishPos.z > maxZ) fishPos.z = maxZ;
 }
 
 int main()
@@ -248,11 +298,11 @@ int main()
     modelShader.setMat4("uP", proj);
     modelShader.setMat4("uV", view);
 
-    // Rotacija modela ribe (posto je model okrenut na stranu)
-    float fishRotation = 0.0f;
-
     while (!glfwWindowShouldClose(window))
     {
+        // Obradi input za kretanje ribe
+        processInput(window);
+
         glClearColor(0.7f, 0.7f, 0.7f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -338,12 +388,10 @@ int main()
         // ===================== 3D MODEL (RIBA) =====================
         modelShader.use();
 
-        fishRotation += 0.5f;
-
         glm::mat4 fishMatrix = glm::mat4(1.0f);
-        fishMatrix = glm::translate(fishMatrix, glm::vec3(0.0f, 0.0f, 0.0f));
-        fishMatrix = glm::rotate(fishMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // ispravi orijentaciju
-        fishMatrix = glm::rotate(fishMatrix, glm::radians(fishRotation), glm::vec3(0.0f, 0.0f, 1.0f)); // rotacija
+        fishMatrix = glm::translate(fishMatrix, fishPos);
+        fishMatrix = glm::rotate(fishMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // ispravi orijentaciju modela
+        fishMatrix = glm::rotate(fishMatrix, glm::radians(fishRotationY), glm::vec3(0.0f, 0.0f, 1.0f)); // rotacija u pravcu kretanja
         fishMatrix = glm::scale(fishMatrix, glm::vec3(0.02f)); // smanji model
 
         modelShader.setMat4("uM", fishMatrix);
