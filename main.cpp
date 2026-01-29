@@ -15,10 +15,14 @@
 
 bool transparent = false;
 
-// Pozicija ribe i rotacija
+// Pozicija ribe 1 i rotacija (WASD + QE)
 glm::vec3 fishPos(0.0f, 0.0f, 0.0f);
 float fishSpeed = 0.01f;
-float fishRotationY = 0.0f;  // rotacija oko Y ose (levo/desno okretanje)
+float fishRotationY = 0.0f;
+
+// Pozicija ribe 2 i rotacija (strelice + KL)
+glm::vec3 fish2Pos(1.0f, 0.0f, 0.0f);  // pocetna pozicija malo udesno
+float fish2RotationY = 0.0f;
 
 // Granice akvarijuma (sa marginom za stakla i ribu)
 const float W = 6.0f, H = 4.0f, D = 3.0f;
@@ -65,13 +69,45 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
         fishPos.y -= fishSpeed;
 
-    // Ogranici poziciju ribe unutar akvarijuma
+    // Ogranici poziciju ribe 1 unutar akvarijuma
     if (fishPos.x < minX) fishPos.x = minX;
     if (fishPos.x > maxX) fishPos.x = maxX;
     if (fishPos.y < minY) fishPos.y = minY;
     if (fishPos.y > maxY) fishPos.y = maxY;
     if (fishPos.z < minZ) fishPos.z = minZ;
     if (fishPos.z > maxZ) fishPos.z = maxZ;
+
+    // ===== RIBA 2 - strelice + KL =====
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        fish2Pos.z -= fishSpeed;
+        fish2RotationY = -90.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        fish2Pos.z += fishSpeed;
+        fish2RotationY = 90.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        fish2Pos.x -= fishSpeed;
+        fish2RotationY = 0.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        fish2Pos.x += fishSpeed;
+        fish2RotationY = 180.0f;
+    }
+
+    // KL - kretanje gore/dole
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+        fish2Pos.y += fishSpeed;
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
+        fish2Pos.y -= fishSpeed;
+
+    // Ogranici poziciju ribe 2 unutar akvarijuma
+    if (fish2Pos.x < minX) fish2Pos.x = minX;
+    if (fish2Pos.x > maxX) fish2Pos.x = maxX;
+    if (fish2Pos.y < minY) fish2Pos.y = minY;
+    if (fish2Pos.y > maxY) fish2Pos.y = maxY;
+    if (fish2Pos.z < minZ) fish2Pos.z = minZ;
+    if (fish2Pos.z > maxZ) fish2Pos.z = maxZ;
 }
 
 int main()
@@ -107,8 +143,9 @@ int main()
     // Shader za 3D modele (ribe itd)
     Shader modelShader("model.vert", "model.frag");
 
-    // ==================== UCITAJ 3D MODEL =====================
+    // ==================== UCITAJ 3D MODELE =====================
     Model fishModel("res/12265_Fish_v1_L2.obj");
+    Model fish2Model("res/12999_Boesemani_Rainbow_v1_l2.obj");
 
     // ==================== TEKSTURE =====================
     glUseProgram(aquariumShader);
@@ -385,7 +422,7 @@ int main()
                 glDrawArrays(GL_TRIANGLE_FAN, f * 4, 4);
         }
 
-        // ===================== 3D MODEL (RIBA) =====================
+        // ===================== 3D MODEL (RIBA 1 - WASD) =====================
         modelShader.use();
 
         glm::mat4 fishMatrix = glm::mat4(1.0f);
@@ -396,6 +433,16 @@ int main()
 
         modelShader.setMat4("uM", fishMatrix);
         fishModel.Draw(modelShader);
+
+        // ===================== 3D MODEL (RIBA 2 - strelice) =====================
+        glm::mat4 fish2Matrix = glm::mat4(1.0f);
+        fish2Matrix = glm::translate(fish2Matrix, fish2Pos);
+        fish2Matrix = glm::rotate(fish2Matrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // ispravi orijentaciju modela
+        fish2Matrix = glm::rotate(fish2Matrix, glm::radians(fish2RotationY), glm::vec3(0.0f, 0.0f, 1.0f)); // rotacija u pravcu kretanja
+        fish2Matrix = glm::scale(fish2Matrix, glm::vec3(0.05f)); // smanji model (uvecano 250%)
+
+        modelShader.setMat4("uM", fish2Matrix);
+        fish2Model.Draw(modelShader);
 
         // ===================== STAKLA (CRTAJU SE POSLEDNJA ZBOG TRANSPARENTNOSTI) =====================
         glUseProgram(aquariumShader);
