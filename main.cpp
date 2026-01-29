@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -33,6 +34,34 @@ const float minY = -H / 2 + 0.4f;  // malo iznad peska
 const float maxY = H / 2 - margin/2;
 const float minZ = -D / 2 + margin;
 const float maxZ = D / 2 - margin;
+
+// Struktura za mehurice
+struct Bubble {
+    glm::vec3 position;
+    float speed;
+    bool active;
+};
+
+std::vector<Bubble> bubbles;
+float bubbleSpeed = 0.005f;  // sporije kretanje
+bool zPressed = false;
+bool oPressed = false;
+const int CIRCLE_SEGMENTS = 32;
+
+// Struktura za gusenice
+struct Caterpillar {
+    glm::vec3 position;
+    float fallSpeed;
+    bool active;
+    bool onGround;  // da li je na pesku
+};
+
+std::vector<Caterpillar> caterpillars;
+float caterpillarFallSpeed = 0.005f;  // sporije padanje
+bool enterPressed = false;
+float fish1Scale = 0.02f;  // pocetna velicina ribe 1
+float fish2Scale = 0.05f;  // pocetna velicina ribe 2
+const float collisionRadius = 0.3f;  // radijus za detekciju sudara
 
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -109,6 +138,135 @@ void processInput(GLFWwindow* window)
     if (fish2Pos.y > maxY) fish2Pos.y = maxY;
     if (fish2Pos.z < minZ) fish2Pos.z = minZ;
     if (fish2Pos.z > maxZ) fish2Pos.z = maxZ;
+
+    // Z - riba 1 ispusta mehurice
+    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS && !zPressed) {
+        zPressed = true;
+        // Izracunaj poziciju usta na osnovu rotacije i velicine
+        float mouthOffset = fish1Scale * 10.0f;  // udaljenost usta od centra
+        glm::vec3 mouthDir(0.0f);
+        if (fishRotationY == 0.0f) mouthDir = glm::vec3(-1, 0, 0);       // levo
+        else if (fishRotationY == 180.0f) mouthDir = glm::vec3(1, 0, 0); // desno
+        else if (fishRotationY == -90.0f) mouthDir = glm::vec3(0, 0, -1); // napred
+        else if (fishRotationY == 90.0f) mouthDir = glm::vec3(0, 0, 1);  // nazad
+
+        glm::vec3 mouthPos = fishPos + mouthDir * mouthOffset + glm::vec3(0, 0.05f, 0);
+
+        for (int i = 0; i < 3; i++) {
+            Bubble b;
+            b.position = mouthPos + glm::vec3(
+                (rand() % 100 - 50) / 500.0f,
+                0.0f,
+                (rand() % 100 - 50) / 500.0f
+            );
+            b.speed = bubbleSpeed + (rand() % 100) / 10000.0f;
+            b.active = true;
+            bubbles.push_back(b);
+        }
+    }
+    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_RELEASE)
+        zPressed = false;
+
+    // O - riba 2 ispusta mehurice
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS && !oPressed) {
+        oPressed = true;
+        // Izracunaj poziciju usta na osnovu rotacije i velicine
+        float mouthOffset2 = fish2Scale * 50.0f;  // udaljenost usta od centra
+        glm::vec3 mouthDir2(0.0f);
+        if (fish2RotationY == 0.0f) mouthDir2 = glm::vec3(-1, 0, 0);       // levo
+        else if (fish2RotationY == 180.0f) mouthDir2 = glm::vec3(1, 0, 0); // desno
+        else if (fish2RotationY == -90.0f) mouthDir2 = glm::vec3(0, 0, -1); // napred
+        else if (fish2RotationY == 90.0f) mouthDir2 = glm::vec3(0, 0, 1);  // nazad
+
+        glm::vec3 mouthPos2 = fish2Pos + mouthDir2 * mouthOffset2 + glm::vec3(0, 0.05f, 0);
+
+        for (int i = 0; i < 3; i++) {
+            Bubble b;
+            b.position = mouthPos2 + glm::vec3(
+                (rand() % 100 - 50) / 500.0f,
+                0.0f,
+                (rand() % 100 - 50) / 500.0f
+            );
+            b.speed = bubbleSpeed + (rand() % 100) / 10000.0f;
+            b.active = true;
+            bubbles.push_back(b);
+        }
+    }
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_RELEASE)
+        oPressed = false;
+
+    // Update pozicija mehurica
+    for (auto& b : bubbles) {
+        if (b.active) {
+            b.position.y += b.speed;
+            // Deaktiviraj mehur kada izadje iz vode
+            if (b.position.y > maxY + 0.1f)
+                b.active = false;
+        }
+    }
+
+    // Ukloni neaktivne mehurice
+    bubbles.erase(
+        std::remove_if(bubbles.begin(), bubbles.end(),
+            [](const Bubble& b) { return !b.active; }),
+        bubbles.end()
+    );
+
+    // ENTER - ispusti gusenice
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && !enterPressed) {
+        enterPressed = true;
+        int numCaterpillars = 2 + rand() % 3;  // 2-4 gusenice
+        for (int i = 0; i < numCaterpillars; i++) {
+            Caterpillar c;
+            c.position = glm::vec3(
+                minX + static_cast<float>(rand()) / RAND_MAX * (maxX - minX),
+                maxY + 0.5f,  // pocni iznad vode
+                minZ + static_cast<float>(rand()) / RAND_MAX * (maxZ - minZ)
+            );
+            c.fallSpeed = caterpillarFallSpeed + (rand() % 50) / 5000.0f;
+            c.active = true;
+            c.onGround = false;
+            caterpillars.push_back(c);
+        }
+    }
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_RELEASE)
+        enterPressed = false;
+
+    // Update gusenica - padanje i detekcija sudara
+    for (auto& c : caterpillars) {
+        if (c.active) {
+            // Padanje ako nije na zemlji
+            if (!c.onGround) {
+                c.position.y -= c.fallSpeed;
+                // Proveri da li je dosla do peska
+                if (c.position.y <= minY) {
+                    c.position.y = minY;
+                    c.onGround = true;
+                }
+            }
+
+            // Detekcija sudara sa ribom 1
+            float dist1 = glm::length(fishPos - c.position);
+            if (dist1 < collisionRadius) {
+                c.active = false;
+                fish1Scale *= 1.1f;  // uvecaj ribu za 10%
+            }
+
+            // Detekcija sudara sa ribom 2
+            float dist2 = glm::length(fish2Pos - c.position);
+            if (dist2 < collisionRadius) {
+                c.active = false;
+                fish2Scale *= 1.1f;  // uvecaj ribu za 10%
+            }
+        }
+    }
+
+    // Ukloni pojedene gusenice
+    caterpillars.erase(
+        std::remove_if(caterpillars.begin(), caterpillars.end(),
+            [](const Caterpillar& c) { return !c.active; }),
+        caterpillars.end()
+    );
 }
 
 int main()
@@ -148,6 +306,7 @@ int main()
     Model fishModel("res/12265_Fish_v1_L2.obj");
     Model fish2Model("res/12999_Boesemani_Rainbow_v1_l2.obj");
     Model seaweedModel("res/morska_trava.obj");
+    Model caterpillarModel("res/Mesh_Centipede.obj");
 
     // Fiksne pozicije za dve morske trave na pesku
     float sandLevel = -H / 2 + 1.0f;  // podignut nivo iznad peska
@@ -334,6 +493,49 @@ int main()
 
     glBindVertexArray(0);
 
+    // ===================== KRUG ZA MEHURICE (BILLBOARD) =====================
+    std::vector<float> circleVertices;
+
+    // Centar kruga
+    circleVertices.insert(circleVertices.end(), {
+        0.0f, 0.0f, 0.0f,    // position
+        1, 1, 1, 1,          // color
+        0.5f, 0.5f,          // UV
+        0, 0, 1              // normal (ka kameri)
+    });
+
+    // Tacke na obodu kruga
+    for (int i = 0; i <= CIRCLE_SEGMENTS; i++) {
+        float angle = 2.0f * 3.14159f * i / CIRCLE_SEGMENTS;
+        float x = cos(angle) * 0.1f;
+        float y = sin(angle) * 0.1f;
+        circleVertices.insert(circleVertices.end(), {
+            x, y, 0.0f,          // position
+            1, 1, 1, 1,          // color
+            0.5f + cos(angle) * 0.5f, 0.5f + sin(angle) * 0.5f,  // UV
+            0, 0, 1              // normal
+        });
+    }
+
+    unsigned int circleVAO, circleVBO;
+    glGenVertexArrays(1, &circleVAO);
+    glGenBuffers(1, &circleVBO);
+
+    glBindVertexArray(circleVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
+    glBufferData(GL_ARRAY_BUFFER, circleVertices.size() * sizeof(float), circleVertices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(7 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+
+    glBindVertexArray(0);
+
     // ===================== MODEL SHADER SETUP =====================
     modelShader.use();
     modelShader.setVec3("uLightPos", 0.0f, 3.0f, 3.0f);
@@ -431,12 +633,13 @@ int main()
 
         // ===================== 3D MODEL (RIBA 1 - WASD) =====================
         modelShader.use();
+        modelShader.setVec3("uFallbackColor", 1.0f, 1.0f, 1.0f);  // bela ako nema teksture
 
         glm::mat4 fishMatrix = glm::mat4(1.0f);
         fishMatrix = glm::translate(fishMatrix, fishPos);
         fishMatrix = glm::rotate(fishMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // ispravi orijentaciju modela
         fishMatrix = glm::rotate(fishMatrix, glm::radians(fishRotationY), glm::vec3(0.0f, 0.0f, 1.0f)); // rotacija u pravcu kretanja
-        fishMatrix = glm::scale(fishMatrix, glm::vec3(0.02f)); // smanji model
+        fishMatrix = glm::scale(fishMatrix, glm::vec3(fish1Scale)); // velicina raste kad jede
 
         modelShader.setMat4("uM", fishMatrix);
         fishModel.Draw(modelShader);
@@ -446,12 +649,14 @@ int main()
         fish2Matrix = glm::translate(fish2Matrix, fish2Pos);
         fish2Matrix = glm::rotate(fish2Matrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // ispravi orijentaciju modela
         fish2Matrix = glm::rotate(fish2Matrix, glm::radians(fish2RotationY), glm::vec3(0.0f, 0.0f, 1.0f)); // rotacija u pravcu kretanja
-        fish2Matrix = glm::scale(fish2Matrix, glm::vec3(0.05f)); // smanji model (uvecano 250%)
+        fish2Matrix = glm::scale(fish2Matrix, glm::vec3(fish2Scale)); // velicina raste kad jede
 
         modelShader.setMat4("uM", fish2Matrix);
         fish2Model.Draw(modelShader);
 
         // ===================== MORSKE TRAVE =====================
+        modelShader.setVec3("uFallbackColor", 0.2f, 0.6f, 0.3f);  // zelena boja za travu
+
         glm::mat4 seaweed1Matrix = glm::mat4(1.0f);
         seaweed1Matrix = glm::translate(seaweed1Matrix, seaweed1Pos);
         seaweed1Matrix = glm::scale(seaweed1Matrix, glm::vec3(1.0f));
@@ -466,10 +671,50 @@ int main()
         modelShader.setMat4("uM", seaweed2Matrix);
         seaweedModel.Draw(modelShader);
 
-        // ===================== STAKLA (CRTAJU SE POSLEDNJA ZBOG TRANSPARENTNOSTI) =====================
-        glUseProgram(aquariumShader);
-        glBindVertexArray(VAO);
+        // ===================== GUSENICE =====================
+        modelShader.setVec3("uFallbackColor", 0.1f, 0.1f, 0.1f);  // crna boja za gusenice
+        for (const auto& c : caterpillars) {
+            if (c.active) {
+                glm::mat4 caterpillarMatrix = glm::mat4(1.0f);
+                caterpillarMatrix = glm::translate(caterpillarMatrix, c.position);
+                caterpillarMatrix = glm::rotate(caterpillarMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                caterpillarMatrix = glm::rotate(caterpillarMatrix, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));  // rotacija u XY ravni
+                caterpillarMatrix = glm::scale(caterpillarMatrix, glm::vec3(0.004f));  // jos manja velicina
 
+                modelShader.setMat4("uM", caterpillarMatrix);
+                caterpillarModel.Draw(modelShader);
+            }
+        }
+
+        // ===================== MEHURICI (BILLBOARD KRUGOVI) =====================
+        glUseProgram(aquariumShader);
+        glBindVertexArray(circleVAO);
+        glUniform1i(glGetUniformLocation(aquariumShader, "useTex"), 0);
+        glUniform1i(glGetUniformLocation(aquariumShader, "transparent"), 1);
+        glUniform4f(glGetUniformLocation(aquariumShader, "uColor"),
+            0.7f, 0.9f, 1.0f, 0.5f);  // svetlo plava providna
+
+        for (const auto& b : bubbles) {
+            if (b.active) {
+                glm::mat4 bubbleMatrix = glm::mat4(1.0f);
+                bubbleMatrix = glm::translate(bubbleMatrix, b.position);
+                // Billboard - uzmi samo rotaciju iz view matrice i invertiraj
+                bubbleMatrix[0][0] = view[0][0]; bubbleMatrix[0][1] = view[1][0]; bubbleMatrix[0][2] = view[2][0];
+                bubbleMatrix[1][0] = view[0][1]; bubbleMatrix[1][1] = view[1][1]; bubbleMatrix[1][2] = view[2][1];
+                bubbleMatrix[2][0] = view[0][2]; bubbleMatrix[2][1] = view[1][2]; bubbleMatrix[2][2] = view[2][2];
+                bubbleMatrix = glm::scale(bubbleMatrix, glm::vec3(0.8f));  // velicina mehura
+
+                glUniformMatrix4fv(
+                    glGetUniformLocation(aquariumShader, "uM"),
+                    1, GL_FALSE, glm::value_ptr(bubbleMatrix)
+                );
+
+                glDrawArrays(GL_TRIANGLE_FAN, 0, CIRCLE_SEGMENTS + 2);
+            }
+        }
+
+        // ===================== STAKLA (CRTAJU SE POSLEDNJA ZBOG TRANSPARENTNOSTI) =====================
+        glBindVertexArray(VAO);
         glUniform1i(glGetUniformLocation(aquariumShader, "useTex"), 0);
         glUniform1i(glGetUniformLocation(aquariumShader, "transparent"), 1);
         glUniform4f(glGetUniformLocation(aquariumShader, "uColor"),

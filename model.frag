@@ -9,6 +9,7 @@ in vec2 chUV;
 uniform vec3 uLightPos;
 uniform vec3 uViewPos;
 uniform vec3 uLightColor;
+uniform vec3 uFallbackColor;  // boja kada nema teksture
 
 uniform sampler2D uDiffMap1;
 
@@ -32,9 +33,9 @@ void main()
 
     vec4 texColor = texture(uDiffMap1, chUV);
 
-    // Ako tekstura nije ucitana (crna), koristi zelenu boju za travu
+    // Ako tekstura nije ucitana (crna), koristi fallback boju
     if (texColor.r < 0.01 && texColor.g < 0.01 && texColor.b < 0.01) {
-        texColor = vec4(0.2, 0.6, 0.3, 1.0);  // zelena boja
+        texColor = vec4(uFallbackColor, 1.0);
     }
 
     FragColor = texColor * vec4(ambient + diffuse + specular, 1.0);
