@@ -34,6 +34,7 @@ const float maxY = H / 2 - margin/2;
 const float minZ = -D / 2 + margin;
 const float maxZ = D / 2 - margin;
 
+
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_T && action == GLFW_PRESS)
@@ -146,6 +147,12 @@ int main()
     // ==================== UCITAJ 3D MODELE =====================
     Model fishModel("res/12265_Fish_v1_L2.obj");
     Model fish2Model("res/12999_Boesemani_Rainbow_v1_l2.obj");
+    Model seaweedModel("res/morska_trava.obj");
+
+    // Fiksne pozicije za dve morske trave na pesku
+    float sandLevel = -H / 2 + 1.0f;  // podignut nivo iznad peska
+    glm::vec3 seaweed1Pos(-1.5f, sandLevel, 1.2f);
+    glm::vec3 seaweed2Pos(1.8f, sandLevel, -0.3f);
 
     // ==================== TEKSTURE =====================
     glUseProgram(aquariumShader);
@@ -443,6 +450,21 @@ int main()
 
         modelShader.setMat4("uM", fish2Matrix);
         fish2Model.Draw(modelShader);
+
+        // ===================== MORSKE TRAVE =====================
+        glm::mat4 seaweed1Matrix = glm::mat4(1.0f);
+        seaweed1Matrix = glm::translate(seaweed1Matrix, seaweed1Pos);
+        seaweed1Matrix = glm::scale(seaweed1Matrix, glm::vec3(1.0f));
+
+        modelShader.setMat4("uM", seaweed1Matrix);
+        seaweedModel.Draw(modelShader);
+
+        glm::mat4 seaweed2Matrix = glm::mat4(1.0f);
+        seaweed2Matrix = glm::translate(seaweed2Matrix, seaweed2Pos);
+        seaweed2Matrix = glm::scale(seaweed2Matrix, glm::vec3(1.0f));
+
+        modelShader.setMat4("uM", seaweed2Matrix);
+        seaweedModel.Draw(modelShader);
 
         // ===================== STAKLA (CRTAJU SE POSLEDNJA ZBOG TRANSPARENTNOSTI) =====================
         glUseProgram(aquariumShader);

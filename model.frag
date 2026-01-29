@@ -14,7 +14,7 @@ uniform sampler2D uDiffMap1;
 
 void main()
 {
-    float ambientStrength = 0.1;
+    float ambientStrength = 0.3;
     vec3 ambient = ambientStrength * uLightColor;
 
     // diffuse
@@ -30,5 +30,12 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     vec3 specular = specularStrength * spec * uLightColor;
 
-    FragColor = texture(uDiffMap1, chUV) * vec4(ambient + diffuse + specular, 1.0);
+    vec4 texColor = texture(uDiffMap1, chUV);
+
+    // Ako tekstura nije ucitana (crna), koristi zelenu boju za travu
+    if (texColor.r < 0.01 && texColor.g < 0.01 && texColor.b < 0.01) {
+        texColor = vec4(0.2, 0.6, 0.3, 1.0);  // zelena boja
+    }
+
+    FragColor = texColor * vec4(ambient + diffuse + specular, 1.0);
 }
