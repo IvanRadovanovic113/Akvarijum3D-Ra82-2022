@@ -35,14 +35,18 @@ public:
     vector<Vertex>       vertices;
     vector<unsigned int> indices;
     vector<Texture>      textures;
+    glm::vec3            diffuseColor;  // boja materijala iz MTL
+    bool                 hasDiffuseColor;
     unsigned int VAO;
 
     // constructor
-    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures, glm::vec3 diffColor = glm::vec3(0.0f), bool hasColor = false)
     {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
+        this->diffuseColor = diffColor;
+        this->hasDiffuseColor = hasColor;
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         setupMesh();
@@ -51,6 +55,11 @@ public:
     // render the mesh
     void Draw(Shader& shader)
     {
+        // Ako mesh ima diffuse boju iz materijala, postavi je kao fallback
+        if (hasDiffuseColor) {
+            shader.setVec3("uFallbackColor", diffuseColor);
+        }
+
         // bind appropriate textures
         unsigned int diffuseNr = 1;
         unsigned int specularNr = 1;

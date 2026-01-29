@@ -49,19 +49,24 @@ bool oPressed = false;
 const int CIRCLE_SEGMENTS = 32;
 
 // Struktura za gusenice
-struct Caterpillar {
+struct Food {
     glm::vec3 position;
+    glm::vec3 rotation;  // random rotacija po sve 3 ose
     float fallSpeed;
     bool active;
     bool onGround;  // da li je na pesku
 };
 
-std::vector<Caterpillar> caterpillars;
-float caterpillarFallSpeed = 0.005f;  // sporije padanje
+std::vector<Food> foods;
+float foodFallSpeed = 0.005f;  // sporije padanje
 bool enterPressed = false;
 float fish1Scale = 0.02f;  // pocetna velicina ribe 1
 float fish2Scale = 0.05f;  // pocetna velicina ribe 2
 const float collisionRadius = 0.3f;  // radijus za detekciju sudara
+
+// Skrinja (chest)
+bool chestOpen = false;  // da li je skrinja otvorena
+bool yPressed = false;
 
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -212,60 +217,73 @@ void processInput(GLFWwindow* window)
         bubbles.end()
     );
 
-    // ENTER - ispusti gusenice
+    // ENTER - ispusti hranu (beans)
     if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && !enterPressed) {
         enterPressed = true;
-        int numCaterpillars = 2 + rand() % 3;  // 2-4 gusenice
-        for (int i = 0; i < numCaterpillars; i++) {
-            Caterpillar c;
-            c.position = glm::vec3(
+        int numFood = 2 + rand() % 3;  // 2-4 komada hrane
+        for (int i = 0; i < numFood; i++) {
+            Food f;
+            f.position = glm::vec3(
                 minX + static_cast<float>(rand()) / RAND_MAX * (maxX - minX),
                 maxY + 0.5f,  // pocni iznad vode
                 minZ + static_cast<float>(rand()) / RAND_MAX * (maxZ - minZ)
             );
-            c.fallSpeed = caterpillarFallSpeed + (rand() % 50) / 5000.0f;
-            c.active = true;
-            c.onGround = false;
-            caterpillars.push_back(c);
+            f.rotation = glm::vec3(
+                static_cast<float>(rand()) / RAND_MAX * 360.0f,  // random X rotacija
+                static_cast<float>(rand()) / RAND_MAX * 360.0f,  // random Y rotacija
+                static_cast<float>(rand()) / RAND_MAX * 360.0f   // random Z rotacija
+            );
+            f.fallSpeed = foodFallSpeed + (rand() % 50) / 5000.0f;
+            f.active = true;
+            f.onGround = false;
+            foods.push_back(f);
         }
     }
     if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_RELEASE)
         enterPressed = false;
 
-    // Update gusenica - padanje i detekcija sudara
-    for (auto& c : caterpillars) {
-        if (c.active) {
+    // Update hrane - padanje i detekcija sudara
+    for (auto& f : foods) {
+        if (f.active) {
             // Padanje ako nije na zemlji
-            if (!c.onGround) {
-                c.position.y -= c.fallSpeed;
+            if (!f.onGround) {
+                f.position.y -= f.fallSpeed;
                 // Proveri da li je dosla do peska
-                if (c.position.y <= minY) {
-                    c.position.y = minY;
-                    c.onGround = true;
+                if (f.position.y <= minY) {
+                    f.position.y = minY;
+                    f.onGround = true;
                 }
             }
 
             // Detekcija sudara sa ribom 1
-            float dist1 = glm::length(fishPos - c.position);
+            float dist1 = glm::length(fishPos - f.position);
             if (dist1 < collisionRadius) {
-                c.active = false;
+                f.active = false;
                 fish1Scale *= 1.1f;  // uvecaj ribu za 10%
             }
 
             // Detekcija sudara sa ribom 2
-            float dist2 = glm::length(fish2Pos - c.position);
+            float dist2 = glm::length(fish2Pos - f.position);
             if (dist2 < collisionRadius) {
-                c.active = false;
+                f.active = false;
                 fish2Scale *= 1.1f;  // uvecaj ribu za 10%
             }
         }
     }
 
-    // Ukloni pojedene gusenice
-    caterpillars.erase(
-        std::remove_if(caterpillars.begin(), caterpillars.end(),
-            [](const Caterpillar& c) { return !c.active; }),
-        caterpillars.end()
+    // Y - otvori/zatvori skrinju
+    if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS && !yPressed) {
+        yPressed = true;
+        chestOpen = !chestOpen;  // toggle
+    }
+    if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_RELEASE)
+        yPressed = false;
+
+    // Ukloni pojedenu hranu
+    foods.erase(
+        std::remove_if(foods.begin(), foods.end(),
+            [](const Food& f) { return !f.active; }),
+        foods.end()
     );
 }
 
@@ -306,7 +324,15 @@ int main()
     Model fishModel("res/12265_Fish_v1_L2.obj");
     Model fish2Model("res/12999_Boesemani_Rainbow_v1_l2.obj");
     Model seaweedModel("res/morska_trava.obj");
-    Model caterpillarModel("res/Mesh_Centipede.obj");
+    Model beanModel("res/260_Kidney Bean.obj");
+    Model chestClosedModel("res/ChestClosed.obj");
+    Model chestOpenModel("res/ChestOpen.obj");
+
+    std::cout << "Chest closed meshes: " << chestClosedModel.meshes.size() << std::endl;
+    std::cout << "Chest open meshes: " << chestOpenModel.meshes.size() << std::endl;
+
+    // Pozicija skrinje - na centru da vidimo da li radi
+    glm::vec3 chestPos(-1.7f, -1.55f, -0.5f);
 
     // Fiksne pozicije za dve morske trave na pesku
     float sandLevel = -H / 2 + 1.0f;  // podignut nivo iznad peska
@@ -671,19 +697,37 @@ int main()
         modelShader.setMat4("uM", seaweed2Matrix);
         seaweedModel.Draw(modelShader);
 
-        // ===================== GUSENICE =====================
-        modelShader.setVec3("uFallbackColor", 0.1f, 0.1f, 0.1f);  // crna boja za gusenice
-        for (const auto& c : caterpillars) {
-            if (c.active) {
-                glm::mat4 caterpillarMatrix = glm::mat4(1.0f);
-                caterpillarMatrix = glm::translate(caterpillarMatrix, c.position);
-                caterpillarMatrix = glm::rotate(caterpillarMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-                caterpillarMatrix = glm::rotate(caterpillarMatrix, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));  // rotacija u XY ravni
-                caterpillarMatrix = glm::scale(caterpillarMatrix, glm::vec3(0.004f));  // jos manja velicina
+        // ===================== HRANA (beans) =====================
+        for (const auto& f : foods) {
+            if (f.active) {
+                glm::mat4 foodMatrix = glm::mat4(1.0f);
+                foodMatrix = glm::translate(foodMatrix, f.position);
+                // Random rotacija po sve 3 ose
+                foodMatrix = glm::rotate(foodMatrix, glm::radians(f.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+                foodMatrix = glm::rotate(foodMatrix, glm::radians(f.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+                foodMatrix = glm::rotate(foodMatrix, glm::radians(f.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+                foodMatrix = glm::scale(foodMatrix, glm::vec3(0.0005f));  // velicina bean-a
 
-                modelShader.setMat4("uM", caterpillarMatrix);
-                caterpillarModel.Draw(modelShader);
+                modelShader.setMat4("uM", foodMatrix);
+                beanModel.Draw(modelShader);
             }
+        }
+
+        // ===================== SKRINJA (CHEST) =====================
+        // Resetuj teksturu da ne koristi bean teksturu
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        modelShader.setVec3("uFallbackColor", 0.16f, 0.08f, 0.06f);  // tamno braon boja drveta iz MTL
+        glm::mat4 chestMatrix = glm::mat4(1.0f);
+        chestMatrix = glm::translate(chestMatrix, chestPos);
+        chestMatrix = glm::rotate(chestMatrix, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));  // rotacija 45 stepeni udesno
+        chestMatrix = glm::scale(chestMatrix, glm::vec3(1.1f));  // probaj razlicite velicine
+
+        modelShader.setMat4("uM", chestMatrix);
+        if (chestOpen) {
+            chestOpenModel.Draw(modelShader);
+        } else {
+            chestClosedModel.Draw(modelShader);
         }
 
         // ===================== MEHURICI (BILLBOARD KRUGOVI) =====================

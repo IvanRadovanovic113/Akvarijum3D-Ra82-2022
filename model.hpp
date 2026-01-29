@@ -149,8 +149,17 @@ private:
         vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "uSpecMap");
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
+        // 3. diffuse color from material (Kd in MTL file)
+        glm::vec3 diffuseColor(0.0f);
+        bool hasDiffuseColor = false;
+        aiColor3D color(0.f, 0.f, 0.f);
+        if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
+            diffuseColor = glm::vec3(color.r, color.g, color.b);
+            hasDiffuseColor = true;
+        }
+
         // return a mesh object created from the extracted mesh data
-        return Mesh(vertices, indices, textures);
+        return Mesh(vertices, indices, textures, diffuseColor, hasDiffuseColor);
     }
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
