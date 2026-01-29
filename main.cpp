@@ -68,6 +68,12 @@ const float collisionRadius = 0.3f;  // radijus za detekciju sudara
 bool chestOpen = false;  // da li je skrinja otvorena
 bool yPressed = false;
 
+// Kamera - rotacija oko akvarijuma
+float cameraAngle = 0.0f;  // ugao rotacije u stepenima
+float cameraRadius = 6.0f;  // udaljenost od centra
+float cameraHeight = 2.0f;  // visina kamere
+float cameraRotSpeed = 1.5f;  // brzina rotacije
+
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -279,6 +285,15 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_RELEASE)
         yPressed = false;
 
+    // N - rotiraj kameru levo
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
+        cameraAngle += cameraRotSpeed;
+    }
+    // M - rotiraj kameru desno
+    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+        cameraAngle -= cameraRotSpeed;
+    }
+
     // Ukloni pojedenu hranu
     foods.erase(
         std::remove_if(foods.begin(), foods.end(),
@@ -332,10 +347,10 @@ int main()
     std::cout << "Chest open meshes: " << chestOpenModel.meshes.size() << std::endl;
 
     // Pozicija skrinje - na centru da vidimo da li radi
-    glm::vec3 chestPos(-1.7f, -1.55f, -0.5f);
+    glm::vec3 chestPos(-1.7f, -1.55f, -0.15f);
 
     // Fiksne pozicije za dve morske trave na pesku
-    float sandLevel = -H / 2 + 1.0f;  // podignut nivo iznad peska
+    float sandLevel = -H / 2 + 0.8f;  // podignut nivo iznad peska
     glm::vec3 seaweed1Pos(-1.5f, sandLevel, 1.2f);
     glm::vec3 seaweed2Pos(1.8f, sandLevel, -0.3f);
 
@@ -410,11 +425,7 @@ int main()
     glEnableVertexAttribArray(3);
 
     // ===================== MATRICE =====================
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0, 2, 6),
-        glm::vec3(0, 0, 0),
-        glm::vec3(0, 1, 0)
-    );
+    // View matrica se sada racuna dinamicki u petlji
     float aspect = (float)mode->width / (float)mode->height;
 
     glm::mat4 proj = glm::perspective(
@@ -564,18 +575,39 @@ int main()
 
     // ===================== MODEL SHADER SETUP =====================
     modelShader.use();
-    modelShader.setVec3("uLightPos", 0.0f, 3.0f, 3.0f);
-    modelShader.setVec3("uViewPos", 0.0f, 2.0f, 6.0f);
-    modelShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
+
+    // Glavni izvor svetlosti - bela boja, prati kameru
+    glm::vec3 mainLightColor(1.0f, 1.0f, 1.0f);
+    float mainLightIntensity = 1.2f;
+
+    modelShader.setVec3("uLightColor", mainLightColor);
+    modelShader.setFloat("uLightIntensity", mainLightIntensity);
+
+    // Svetlo iz kovčega (blago) - zlatna boja
+    glm::vec3 treasureLightColor(1.0f, 0.85f, 0.3f);
+
+    modelShader.setVec3("uLight2Color", treasureLightColor);
+    modelShader.setFloat("uLight2Intensity", 0.0f);  // pocetno ugaseno
+
     modelShader.setMat4("uP", proj);
-    modelShader.setMat4("uV", view);
 
     while (!glfwWindowShouldClose(window))
     {
         // Obradi input za kretanje ribe
         processInput(window);
 
-        glClearColor(0.7f, 0.7f, 0.7f, 1.0f);
+        // ===================== DINAMICKA KAMERA =====================
+        float camX = sin(glm::radians(cameraAngle)) * cameraRadius;
+        float camZ = cos(glm::radians(cameraAngle)) * cameraRadius;
+        glm::vec3 cameraPos(camX, cameraHeight, camZ);
+
+        glm::mat4 view = glm::lookAt(
+            cameraPos,
+            glm::vec3(0, 0, 0),  // gleda u centar akvarijuma
+            glm::vec3(0, 1, 0)
+        );
+
+        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);  // tamna pozadina
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // ===================== AKVARIJUM SHADER =====================
@@ -659,6 +691,21 @@ int main()
 
         // ===================== 3D MODEL (RIBA 1 - WASD) =====================
         modelShader.use();
+
+        // Azuriraj view matricu i poziciju kamere/svetla
+        modelShader.setMat4("uV", view);
+        modelShader.setVec3("uViewPos", cameraPos);
+        modelShader.setVec3("uLightPos", cameraPos);  // svetlo prati kameru
+
+        // Postavi svetlo iz kovčega - uključeno samo kada je otvoren
+        glm::vec3 treasurePos = chestPos + glm::vec3(0.0f, 0.8f, 0.0f);  // malo iznad kovčega
+        modelShader.setVec3("uLight2Pos", treasurePos);
+        if (chestOpen) {
+            modelShader.setFloat("uLight2Intensity", 2.5f);  // jači zlatni sjaj iz blaga
+        } else {
+            modelShader.setFloat("uLight2Intensity", 0.0f);  // ugašeno
+        }
+
         modelShader.setVec3("uFallbackColor", 1.0f, 1.0f, 1.0f);  // bela ako nema teksture
 
         glm::mat4 fishMatrix = glm::mat4(1.0f);
