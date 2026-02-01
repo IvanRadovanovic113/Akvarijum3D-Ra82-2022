@@ -17,7 +17,7 @@ bool transparent = false;
 
 // Riba 1 (WASD + QE)
 glm::vec3 fishPos(0.0f, 0.0f, 0.0f);
-float fishSpeed = 0.01f;
+float fishSpeed = 0.0125f;
 float fishRotationY = 0.0f;
 float fish1Scale = 0.02f;
 
@@ -43,7 +43,7 @@ struct Bubble {
     bool active;
 };
 std::vector<Bubble> bubbles;
-float bubbleSpeed = 0.005f;
+float bubbleSpeed = 0.00625f;
 bool zPressed = false;
 bool oPressed = false;
 const int CIRCLE_SEGMENTS = 32;
@@ -57,7 +57,7 @@ struct Food {
     bool onGround;
 };
 std::vector<Food> foods;
-float foodFallSpeed = 0.005f;
+float foodFallSpeed = 0.00625f;
 bool enterPressed = false;
 const float collisionRadius = 0.3f;
 
@@ -70,6 +70,11 @@ float cameraAngle = 0.0f;
 float cameraRadius = 6.0f;
 float cameraHeight = 2.0f;
 float cameraRotSpeed = 1.5f;
+
+// Frame limiter
+const float targetFPS = 75.0f;
+const float frameTime = 1.0f / targetFPS;
+float lastFrameTime = 0.0f;
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -158,7 +163,7 @@ void processInput(GLFWwindow* window)
     // O - mehurici ribe 2
     if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS && !oPressed) {
         oPressed = true;
-        float mouthOffset2 = fish2Scale * 50.0f;
+        float mouthOffset2 = fish2Scale * 5.0f;
         glm::vec3 mouthDir2(0.0f);
         if (fish2RotationY == 0.0f) mouthDir2 = glm::vec3(-1, 0, 0);
         else if (fish2RotationY == 180.0f) mouthDir2 = glm::vec3(1, 0, 0);
@@ -437,6 +442,14 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
+        // Frame limiter - cekaj do 75 FPS
+        float currentTime = (float)glfwGetTime();
+        float elapsed = currentTime - lastFrameTime;
+        if (elapsed < frameTime) {
+            glfwWaitEventsTimeout(frameTime - elapsed);
+        }
+        lastFrameTime = (float)glfwGetTime();
+
         processInput(window);
 
         // Kamera
