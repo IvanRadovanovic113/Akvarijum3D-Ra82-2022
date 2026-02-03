@@ -48,7 +48,7 @@ bool zPressed = false;
 bool oPressed = false;
 const int CIRCLE_SEGMENTS = 32;
 
-// Hrana (beans)
+// Hrana 
 struct Food {
     glm::vec3 position;
     glm::vec3 rotation;
@@ -61,7 +61,7 @@ float foodFallSpeed = 0.00625f;
 bool enterPressed = false;
 const float collisionRadius = 0.3f;
 
-// Skrinja
+// Chest
 bool chestOpen = false;
 bool yPressed = false;
 
@@ -564,7 +564,7 @@ int main()
         if (chestOpen) chestOpenModel.Draw(modelShader);
         else chestClosedModel.Draw(modelShader);
 
-        // Mehurici (billboard)
+        // Mehurici 
         glUseProgram(aquariumShader);
         glBindVertexArray(circleVAO);
         glUniform1i(glGetUniformLocation(aquariumShader, "useTex"), 0);
