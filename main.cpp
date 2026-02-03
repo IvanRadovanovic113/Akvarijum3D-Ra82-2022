@@ -76,6 +76,10 @@ const float targetFPS = 75.0f;
 const float frameTime = 1.0f / targetFPS;
 float lastFrameTime = 0.0f;
 
+// Renderovanje
+bool depthTestEnabled = true;
+bool faceCullingEnabled = false;
+
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_T && action == GLFW_PRESS)
@@ -83,6 +87,20 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    // 1 - toggle depth test
+    if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
+        depthTestEnabled = !depthTestEnabled;
+        if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+        else glDisable(GL_DEPTH_TEST);
+    }
+
+    // 2 - toggle face culling
+    if (key == GLFW_KEY_2 && action == GLFW_PRESS) {
+        faceCullingEnabled = !faceCullingEnabled;
+        if (faceCullingEnabled) glEnable(GL_CULL_FACE);
+        else glDisable(GL_CULL_FACE);
+    }
 }
 
 void processInput(GLFWwindow* window)
@@ -286,6 +304,9 @@ int main()
     glm::vec3 seaweed1Pos(-1.5f, sandLevel, 1.2f);
     glm::vec3 seaweed2Pos(1.8f, sandLevel, -0.3f);
 
+    // HUD shader za potpis
+    unsigned int hudShader = createShader("hud.vert", "hud.frag");
+
     // Teksture
     glUseProgram(aquariumShader);
     glUniform1i(glGetUniformLocation(aquariumShader, "uTex"), 0);
@@ -297,6 +318,14 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Tekstura za potpis
+    unsigned int potpisTexture = loadImageToTexture("res/potpis.png");
+    glBindTexture(GL_TEXTURE_2D, potpisTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Kocka VAO (za dno, coskove, stakla)
     float vertices[] = {
@@ -430,6 +459,36 @@ int main()
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(9 * sizeof(float)));
     glEnableVertexAttribArray(3);
+    glBindVertexArray(0);
+
+    // HUD quad za potpis (gornji desni ugao)
+    float hudW = 0.3f;  // sirina
+    float hudH = 0.08f; // visina
+    float hudX = 1.0f - hudW - 0.02f;  // desno sa marginom
+    float hudY = 1.0f - hudH - 0.02f;  // gore sa marginom
+
+    float hudVertices[] = {
+        // pozicija (NDC)           UV
+        hudX,        hudY,        0.0f, 0.0f,
+        hudX + hudW, hudY,        1.0f, 0.0f,
+        hudX + hudW, hudY + hudH, 1.0f, 1.0f,
+        hudX,        hudY + hudH, 0.0f, 1.0f
+    };
+    unsigned int hudIndices[] = { 0, 1, 2, 0, 2, 3 };
+
+    unsigned int hudVAO, hudVBO, hudEBO;
+    glGenVertexArrays(1, &hudVAO);
+    glGenBuffers(1, &hudVBO);
+    glGenBuffers(1, &hudEBO);
+    glBindVertexArray(hudVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, hudVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(hudVertices), hudVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, hudEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(hudIndices), hudIndices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 
     // Model shader setup
@@ -606,6 +665,16 @@ int main()
             glUniformMatrix4fv(glGetUniformLocation(aquariumShader, "uM"), 1, GL_FALSE, glm::value_ptr(m));
             for (int f = 0; f < 6; f++) glDrawArrays(GL_TRIANGLE_FAN, f * 4, 4);
         }
+
+        // HUD - potpis (renderuje se bez depth testa)
+        glDisable(GL_DEPTH_TEST);
+        glUseProgram(hudShader);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, potpisTexture);
+        glUniform1i(glGetUniformLocation(hudShader, "uTex"), 0);
+        glBindVertexArray(hudVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
