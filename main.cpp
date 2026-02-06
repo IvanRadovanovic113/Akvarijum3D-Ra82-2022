@@ -88,18 +88,25 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // 1 - toggle depth test
+    // 1 - ukljuci depth test
     if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
-        depthTestEnabled = !depthTestEnabled;
-        if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
-        else glDisable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
+        depthTestEnabled = true;
     }
-
-    // 2 - toggle face culling
+    // 2 - iskljuci depth test
     if (key == GLFW_KEY_2 && action == GLFW_PRESS) {
-        faceCullingEnabled = !faceCullingEnabled;
-        if (faceCullingEnabled) glEnable(GL_CULL_FACE);
-        else glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
+        depthTestEnabled = false;
+    }
+    // 3 - ukljuci face culling
+    if (key == GLFW_KEY_3 && action == GLFW_PRESS) {
+        glEnable(GL_CULL_FACE);
+        faceCullingEnabled = true;
+    }
+    // 4 - iskljuci face culling
+    if (key == GLFW_KEY_4 && action == GLFW_PRESS) {
+        glDisable(GL_CULL_FACE);
+        faceCullingEnabled = false;
     }
 }
 
@@ -286,6 +293,8 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     // Shaderi
     unsigned int aquariumShader = createShader("basic.vert", "basic.frag");
@@ -623,7 +632,7 @@ int main()
         if (chestOpen) chestOpenModel.Draw(modelShader);
         else chestClosedModel.Draw(modelShader);
 
-        // Mehurici 
+        // Mehurici
         glUseProgram(aquariumShader);
         glBindVertexArray(circleVAO);
         glUniform1i(glGetUniformLocation(aquariumShader, "useTex"), 0);
